@@ -16,6 +16,16 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException("Authentication required");
     }
 
+    const token = authorization.substring(7).trim();
+
+    if (!token) {
+      throw new UnauthorizedException("Invalid authentication token");
+    }
+
+    request.user = {
+      authenticated: true,
+    };
+
     return true;
   }
 }
