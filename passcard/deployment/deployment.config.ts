@@ -1,13 +1,13 @@
 export const deploymentConfig = {
   production: {
+    domain: "passcard.eu.org",
+
     frontend: {
-      domain: "www.passcard.com",
-      protocol: "https",
+      url: "https://passcard.eu.org",
     },
 
     backend: {
-      domain: "api.passcard.com",
-      protocol: "https",
+      url: "https://api.passcard.eu.org",
     },
 
     environment: "production",
