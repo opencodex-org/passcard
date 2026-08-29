@@ -1,0 +1,20 @@
+{
+  "name": "PassCard",
+  "short_name": "PassCard",
+  "description": "منصة البطاقات الرقمية المخصصة متعددة المستويات.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar",
+  "theme_color": "#0b1020",
+  "background_color": "#0b1020",
+  "icons": [
+    {
+      "src": "/passcard-site.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
