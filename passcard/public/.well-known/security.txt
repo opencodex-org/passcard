@@ -1,0 +1,4 @@
+Contact: mailto:security@passcard.pages.dev
+Preferred-Languages: ar, en
+Canonical: https://passcard.pages.dev/.well-known/security.txt
+Expires: 2027-08-29T00:00:00Z
