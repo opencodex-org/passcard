@@ -1,0 +1,1 @@
+"deploy": "npm run build && npx wrangler pages deploy ./frontend/dist --project-name passcard"
