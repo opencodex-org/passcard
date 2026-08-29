@@ -1,0 +1,26 @@
+name: Deploy PassCard to Cloudflare Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy ./public --project-name=passcard
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
