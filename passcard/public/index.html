@@ -1,27 +1,9 @@
-<meta
-  name="description"
-  content="PassCard — منصة متطورة لإنشاء وإدارة البطاقات الرقمية الشخصية والعائلية وبطاقات الأطفال."
-/>
-
-<meta
-  name="keywords"
-  content="PassCard, digital card, digital identity, بطاقة رقمية, بطاقة شخصية"
-/>
-
-<meta property="og:title" content="PassCard" />
-
-<meta
-  property="og:description"
-  content="منصة البطاقات الرقمية المخصصة متعددة المستويات."
-/>
-
-<meta
-  property="og:image"
-  content="https://passcard.pages.dev/passcard-site.png"
-/>
-
-<meta property="og:url" content="https://passcard.pages.dev/" />
-
-<meta property="og:type" content="website" />
-
-<meta name="twitter:card" content="summary_large_image" />
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch((error) => {
+        console.error("PassCard service worker registration failed:", error);
+      });
+    });
+  }
+</script>
