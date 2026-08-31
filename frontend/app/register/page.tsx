@@ -2,9 +2,11 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { GoogleLogin } from "@react-oauth/google";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://passcard-igfn.onrender.com/api/v1";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -61,22 +63,48 @@ export default function RegisterPage() {
         throw new Error(data?.message || "تعذر إنشاء الحساب.");
       }
 
-      setMessage("تم إرسال طلب التسجيل بنجاح.");
+      setMessage("تم إنشاء الحساب بنجاح.");
     } catch (error) {
       setMessage(
-        error instanceof Error
-          ? error.message
-          : "حدث خطأ غير متوقع."
+        error instanceof Error ? error.message : "حدث خطأ غير متوقع."
       );
     } finally {
       setLoading(false);
     }
   }
 
-  function handleGoogle() {
-    setMessage(
-      "تسجيل Google يحتاج أولًا إلى تفعيل Google OAuth في الـBackend."
-    );
+  async function handleGoogleSuccess(credential: string) {
+    setMessage("");
+
+    try {
+      setLoading(true);
+
+      const response = await fetch(`${API_URL}/auth/google`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ credential }),
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "فشل التسجيل باستخدام Google."
+        );
+      }
+
+      setMessage(
+        `مرحبًا ${data?.user?.name || ""}، تم التسجيل باستخدام Google بنجاح.`
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "حدث خطأ غير متوقع."
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -92,13 +120,24 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleGoogle}
-          className="w-full rounded-xl border border-gray-300 px-4 py-3 font-semibold transition hover:bg-gray-100"
-        >
-          التسجيل باستخدام Google
-        </button>
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={(response) => {
+              if (response.credential) {
+                handleGoogleSuccess(response.credential);
+              } else {
+                setMessage("لم يتم استلام بيانات Google.");
+              }
+            }}
+            onError={() => {
+              setMessage("تعذر التسجيل باستخدام Google.");
+            }}
+            useOneTap={false}
+            text="signup_with"
+            shape="rectangular"
+            width="100%"
+          />
+        </div>
 
         <div className="my-4 flex items-center gap-3">
           <div className="h-px flex-1 bg-gray-200" />
@@ -111,6 +150,7 @@ export default function RegisterPage() {
             <span className="mb-2 block text-sm font-medium">
               الاسم
             </span>
+
             <input
               type="text"
               value={name}
@@ -124,6 +164,7 @@ export default function RegisterPage() {
             <span className="mb-2 block text-sm font-medium">
               البريد الإلكتروني
             </span>
+
             <input
               type="email"
               value={email}
@@ -137,6 +178,7 @@ export default function RegisterPage() {
             <span className="mb-2 block text-sm font-medium">
               رقم الجوال
             </span>
+
             <input
               type="tel"
               inputMode="numeric"
@@ -148,6 +190,7 @@ export default function RegisterPage() {
               placeholder="05XXXXXXXX"
               className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-black"
             />
+
             <span className="mt-2 block text-xs text-gray-400">
               يجب أن يتكون رقم الجوال من 10 أرقام.
             </span>
@@ -157,6 +200,7 @@ export default function RegisterPage() {
             <span className="mb-2 block text-sm font-medium">
               كلمة المرور
             </span>
+
             <input
               type="password"
               value={password}
@@ -173,6 +217,7 @@ export default function RegisterPage() {
               onChange={(e) => setAccepted(e.target.checked)}
               className="mt-1 h-4 w-4"
             />
+
             <span>
               أوافق على شروط الاستخدام وسياسة الخصوصية.
             </span>
