@@ -3,12 +3,19 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { OAuth2Client } from "google-auth-library";
 
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 
+const GOOGLE_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID ||
+  "1010378538216-jqt8nn2e3brtlplhr4jcore830ef2aqp.apps.googleusercontent.com";
+
 @Injectable()
 export class AuthService {
+  private readonly googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
   async register(data: RegisterDto) {
     if (!data.name?.trim()) {
       throw new BadRequestException("Name is required");
@@ -72,5 +79,47 @@ export class AuthService {
         identityVerified: false,
       },
     };
+  }
+
+  async google(credential: string) {
+    if (!credential?.trim()) {
+      throw new BadRequestException("Google credential is required");
+    }
+
+    try {
+      const ticket = await this.googleClient.verifyIdToken({
+        idToken: credential,
+        audience: GOOGLE_CLIENT_ID,
+      });
+
+      const payload = ticket.getPayload();
+
+      if (!payload?.sub || !payload.email) {
+        throw new UnauthorizedException(
+          "Invalid Google account information",
+        );
+      }
+
+      return {
+        success: true,
+        message: "Google authentication successful.",
+        user: {
+          id: payload.sub,
+          name: payload.name || "",
+          email: payload.email,
+          picture: payload.picture || "",
+        },
+        security: {
+          authenticated: true,
+          emailVerified: payload.email_verified === true,
+          phoneVerified: false,
+          identityVerified: false,
+        },
+      };
+    } catch {
+      throw new UnauthorizedException(
+        "Google authentication failed",
+      );
+    }
   }
 }
