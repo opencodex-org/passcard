@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "passcard",
-  "pages_build_output_dir": "./dist",
+  "pages_build_output_dir": "./frontend/out",
   "compatibility_date": "2026-08-29"
 }
