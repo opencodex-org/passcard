@@ -1,91 +1,101 @@
-# PassCard
+# PassCard - منصة مالية رقمية متكاملة
 
-PassCard is a digital card platform for creating, managing, reviewing, and customizing digital cards.
+## Digital Financial Platform
 
-## Project Status
+**PassCard** — كل أموالك في مكان واحد
 
-Early development.
+### نظرة عامة
 
-## Main Features
+منصة مالية رقمية متكاملة توفر:
+- إدارة الحسابات والبطاقات
+- التحويلات المحلية والدولية
+- سداد الفواتير
+- حسابات Kids مع إشراف ولي الأمر
+- نظام أمان شامل
+- لوحة إدارة متقدمة
 
-- Google authentication
-- Email authentication
-- Phone verification with OTP
-- CAPTCHA protection
-- User profiles
-- Identity verification workflow
-- Digital card creation
-- Card customization
-- Admin review and approval
-- Multiple card levels
-- Kids accounts
-- Parental controls
-- Internal wallet ledger
-- Rewards
-- Developer portal
-- API keys
-- Webhooks
-- Sandbox payments
-- Support tickets
-- Notifications
-- Audit logs
-- Role-based access control
+### المميزات الرئيسية
 
-## Card Levels
+✅ تطبيق المستخدم المتكامل
+✅ نظام التحقق والتسجيل
+✅ إدارة البطاقات (أساسية، إضافية، افتراضية)
+✅ تخصيص البطاقات برفع الصور
+✅ دعم Mada و Apple Pay و Google Wallet
+✅ نظام التحويلات
+✅ إدارة المستفيدين
+✅ سداد الفواتير
+✅ حسابات Kids
+✅ مستويات الحساب (Bronze/Silver/Gold/Platinum)
+✅ لوحة إدارة شاملة
+✅ RBAC مع 6 أدوار مختلفة
+✅ Audit Log كامل
+✅ دعم العربية والإنجليزية
 
-1. Basic Card
-2. Standard Card
-3. Advanced Card
-4. Premium Card
-5. Elite Card
-6. Ultra Elite Card
-7. MAX Card
+### البنية المعمارية
 
-## Technology
+```
+PassCard/
+├── backend/              # خادم Node.js/Express
+├── mobile/              # تطبيق React Native
+├── web/                 # منصة ويب React
+├── admin/               # لوحة الإدارة
+├── docs/                # التوثيق
+└── infrastructure/      # الإعدادات والبيانات
+```
 
-### Frontend
+### التقنيات المستخدمة
 
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
+**Backend:**
+- Node.js + Express.js
+- MongoDB + Redis
+- JWT Authentication
+- Stripe/PayPal Integration
+- Firebase Admin SDK
 
-### Backend
+**Frontend:**
+- React.js
+- React Native
+- TailwindCSS
+- Internationalization (i18n)
 
-- NestJS
-- TypeScript
-- Prisma
-
-### Database
-
-- PostgreSQL
-
-### Infrastructure
-
+**Infrastructure:**
 - Docker
-- Redis
-- GitHub Actions
+- Docker Compose
+- GitHub Actions (CI/CD)
 
-## Security
-
-PassCard is designed with security in mind.
-
-The project must:
-
-- Never store real card numbers.
-- Never store CVV or PIN data.
-- Never place API keys or passwords in source control.
-- Use environment variables for secrets.
-- Use secure authentication.
-- Apply rate limiting.
-- Apply input validation.
-- Maintain audit logs.
-- Protect children's data.
-- Use role-based permissions.
-
-## Environment Variables
-
-Copy the example environment file:
+### التثبيت والتشغيل
 
 ```bash
-cp .env.example .env
+# Clone the repository
+git clone https://github.com/opencodex-org/PassCard.git
+cd PassCard
+
+# Setup development environment
+make setup
+
+# Start development servers
+make dev
+```
+
+### الأوامر المتاحة
+
+```bash
+make setup     # إعداد بيئة التطوير
+make dev       # تشغيل خوادم التطوير
+make test      # تشغيل الاختبارات
+make build     # البناء للإنتاج
+make deploy    # النشر
+make clean     # تنظيف الملفات
+```
+
+### الخدمات المتاحة
+
+- **API**: http://localhost:3000
+- **Admin Panel**: http://localhost:3001
+- **Web Platform**: http://localhost:3002
+- **MongoDB**: localhost:27017
+- **Redis**: localhost:6379
+
+### التطوير
+
+جميع الحقوق محفوظة © 2024 OpenCodex
