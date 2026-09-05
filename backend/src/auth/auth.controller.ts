@@ -1,6 +1,5 @@
 import { Body, Controller, Post } from "@nestjs/common";
 import { AuthService } from "./auth.service";
-import { GoogleAuthDto } from "./dto/google-auth.dto";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 
@@ -16,10 +15,5 @@ export class AuthController {
   @Post("login")
   async login(@Body() data: LoginDto) {
     return this.authService.login(data);
-  }
-
-  @Post("google")
-  async google(@Body() data: GoogleAuthDto) {
-    return this.authService.google(data.credential);
   }
 }

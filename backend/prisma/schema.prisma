@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String   @id @default(uuid())
+  name              String
+  email             String   @unique
+  phone             String   @unique
+  passwordHash      String
+  dateOfBirth       DateTime
+  ageGroup          String
+  gender            String?
+  emailVerified     Boolean  @default(false)
+  phoneVerified     Boolean  @default(false)
+  identityVerified  Boolean  @default(false)
+  role              String   @default("USER")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  cards          Card[]
+  wallet         Wallet?
+  transactions   Transaction[]
+  payments       Payment[]
+  address        Address?
+  verifications  Verification[]
+  otpCodes       OtpCode[]
+  guardianLinks  GuardianLink[] @relation("Child")
+  children       GuardianLink[] @relation("Guardian")
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  region       String
+  city         String
+  district     String
+  street       String
+  building     String?
+  postalCode   String?
+  extraDetails String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GuardianLink {
+  id             String   @id @default(uuid())
+  childId        String
+  guardianId     String
+  guardianPhone  String?
+  verified       Boolean  @default(false)
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+
+  child    User @relation("Child", fields: [childId], references: [id], onDelete: Cascade)
+  guardian User @relation("Guardian", fields: [guardianId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, guardianId])
+  @@index([childId])
+  @@index([guardianId])
+}
+
+model CardLevel {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  priceMinor  Int      @default(0)
+  active      Boolean  @default(true)
+  color       String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cards Card[]
+}
+
+model Card {
+  id          String   @id @default(uuid())
+  userId      String
+  cardLevelId String
+  cardNumber  String   @unique
+  ageGroup    String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardLevel CardLevel @relation(fields: [cardLevelId], references: [id])
+
+  @@index([userId])
+  @@index([cardLevelId])
+}
+
+model Wallet {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  balanceMinor Int      @default(0)
+  points       Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  walletId    String
+  amountMinor Int
+  type        String
+  status      String   @default("PENDING")
+  reference   String?  @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([walletId])
+}
+
+model Reward {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  points      Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Verification {
+  id                String   @id @default(uuid())
+  userId            String
+  nationalId        String?
+  identityImageUrl  String?
+  selfieImageUrl    String?
+  status            String   @default("PENDING")
+  reviewedAt        DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model OtpCode {
+  id         String   @id @default(uuid())
+  userId     String
+  purpose    String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  userId            String
+  amountMinor       Int
+  currency          String   @default("SAR")
+  provider          String
+  providerPaymentId String?  @unique
+  transactionId     String?  @unique
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

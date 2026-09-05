@@ -1,0 +1,172 @@
+// use prisma-next
+
+types {
+  Uuid = String @db.Uuid
+}
+
+model User {
+  id               Uuid     @id @default(uuid())
+  name             String
+  email            String   @unique
+  phone            String   @unique
+  passwordHash     String
+  dateOfBirth      DateTime
+  ageGroup         String
+  gender           String?
+  emailVerified    Boolean  @default(false)
+  phoneVerified    Boolean  @default(false)
+  identityVerified Boolean  @default(false)
+  role             String   @default("USER")
+  createdAt        DateTime @default(now())
+
+  cards         Card[]
+  wallet        Wallet?
+  transactions Transaction[]
+  payments      Payment[]
+  address       Address?
+  verifications Verification[]
+  otpCodes      OtpCode[]
+  guardianLinks GuardianLink[] @relation("Child")
+  children      GuardianLink[] @relation("Guardian")
+}
+
+model Address {
+  id           Uuid   @id @default(uuid())
+  userId       Uuid   @unique
+  region       String
+  city         String
+  district     String
+  street       String
+  building     String?
+  postalCode   String?
+  extraDetails String?
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model GuardianLink {
+  id            Uuid     @id @default(uuid())
+  childId       Uuid
+  guardianId    Uuid
+  guardianPhone String?
+  verified      Boolean  @default(false)
+  verifiedAt    DateTime?
+
+  child    User @relation("Child", fields: [childId], references: [id])
+  guardian User @relation("Guardian", fields: [guardianId], references: [id])
+
+  @@unique([childId, guardianId])
+  @@index([childId])
+  @@index([guardianId])
+}
+
+model CardLevel {
+  id          Uuid     @id @default(uuid())
+  name        String   @unique
+  description String?
+  priceMinor  Int      @default(0)
+  active      Boolean  @default(true)
+  color       String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  cards Card[]
+}
+
+model Card {
+  id          Uuid     @id @default(uuid())
+  userId      Uuid
+  cardLevelId Uuid
+  cardNumber  String   @unique
+  ageGroup    String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id])
+  cardLevel CardLevel @relation(fields: [cardLevelId], references: [id])
+
+  @@index([userId])
+  @@index([cardLevelId])
+}
+
+model Wallet {
+  id           Uuid     @id @default(uuid())
+  userId       Uuid     @unique
+  balanceMinor Int      @default(0)
+  points       Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          Uuid     @id @default(uuid())
+  userId      Uuid
+  walletId    Uuid
+  amountMinor Int
+  type        String
+  status      String   @default("PENDING")
+  reference   String?  @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  wallet Wallet @relation(fields: [walletId], references: [id])
+
+  @@index([userId])
+  @@index([walletId])
+}
+
+model Reward {
+  id          Uuid     @id @default(uuid())
+  name        String
+  description String?
+  points      Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Verification {
+  id               Uuid     @id @default(uuid())
+  userId           Uuid
+  nationalId       String?
+  identityImageUrl String?
+  selfieImageUrl   String?
+  status           String   @default("PENDING")
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model OtpCode {
+  id         Uuid     @id @default(uuid())
+  userId     Uuid
+  purpose    String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, purpose])
+}
+
+model Payment {
+  id                Uuid     @id @default(uuid())
+  userId            Uuid
+  amountMinor       Int
+  currency          String   @default("SAR")
+  provider          String
+  providerPaymentId String?  @unique
+  transactionId     Uuid?    @unique
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}

@@ -1,31 +1,107 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { OAuth2Client } from "google-auth-library";
+import { PrismaService } from "../prisma.service";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+import jwt from "jsonwebtoken";
 
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 
-const GOOGLE_CLIENT_ID =
-  process.env.GOOGLE_CLIENT_ID ||
-  "1010378538216-jqt8nn2e3brtlplhr4jcore830ef2aqp.apps.googleusercontent.com";
+const scryptAsync = promisify(scrypt);
 
 @Injectable()
 export class AuthService {
-  private readonly googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+  constructor(private readonly prisma: PrismaService) {}
+
+  private calculateAge(dateOfBirth: Date): number {
+    const today = new Date();
+
+    let age = today.getFullYear() - dateOfBirth.getFullYear();
+
+    const month = today.getMonth() - dateOfBirth.getMonth();
+
+    if (
+      month < 0 ||
+      (month === 0 && today.getDate() < dateOfBirth.getDate())
+    ) {
+      age--;
+    }
+
+    return age;
+  }
+
+  private getAgeGroup(age: number): string {
+    if (age >= 0 && age <= 17) {
+      return "KIDS";
+    }
+
+    if (age >= 18 && age <= 40) {
+      return "ADULT";
+    }
+
+    if (age >= 41 && age <= 150) {
+      return "SENIOR";
+    }
+
+    throw new BadRequestException("Invalid date of birth");
+  }
+
+  private async hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(16).toString("hex");
+
+    const derivedKey = (await scryptAsync(
+      password,
+      salt,
+      64,
+    )) as Buffer;
+
+    return `${salt}:${derivedKey.toString("hex")}`;
+  }
+
+  private async verifyPassword(
+    password: string,
+    storedPassword: string,
+  ): Promise<boolean> {
+    const [salt, storedKey] = storedPassword.split(":");
+
+    if (!salt || !storedKey) {
+      return false;
+    }
+
+    const derivedKey = (await scryptAsync(
+      password,
+      salt,
+      64,
+    )) as Buffer;
+
+    const storedKeyBuffer = Buffer.from(storedKey, "hex");
+
+    if (derivedKey.length !== storedKeyBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(derivedKey, storedKeyBuffer);
+  }
 
   async register(data: RegisterDto) {
-    if (!data.name?.trim()) {
+    const name = data.name?.trim();
+    const email = data.email?.trim().toLowerCase();
+    const phone = data.phone?.trim();
+
+    if (!name) {
       throw new BadRequestException("Name is required");
     }
 
-    if (!data.email?.trim()) {
+    if (!email) {
       throw new BadRequestException("Email is required");
     }
 
-    if (!data.phone?.trim()) {
+    if (!phone) {
       throw new BadRequestException("Phone is required");
     }
 
@@ -35,91 +111,161 @@ export class AuthService {
       );
     }
 
+    const dateOfBirth = new Date(data.dateOfBirth);
+
+    if (Number.isNaN(dateOfBirth.getTime())) {
+      throw new BadRequestException("Invalid date of birth");
+    }
+
+    if (dateOfBirth > new Date()) {
+      throw new BadRequestException(
+        "Date of birth cannot be in the future",
+      );
+    }
+
+    const age = this.calculateAge(dateOfBirth);
+    const ageGroup = this.getAgeGroup(age);
+
+    const existingUser = await this.prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { phone }],
+      },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+      },
+    });
+
+    if (existingUser) {
+      if (existingUser.email === email) {
+        throw new ConflictException("Email is already registered");
+      }
+
+      throw new ConflictException("Phone is already registered");
+    }
+
+    const passwordHash = await this.hashPassword(data.password);
+
+    const user = await this.prisma.user.create({
+      data: {
+        name,
+        email,
+        phone,
+        passwordHash,
+        dateOfBirth,
+        ageGroup,
+        wallet: {
+          create: {
+            balanceMinor: 0,
+            points: 0,
+          },
+        },
+      },
+      include: {
+        wallet: true,
+        _count: {
+          select: {
+            cards: true,
+          },
+        },
+      },
+    });
+
     return {
       success: true,
-      message: "Registration request received.",
+      message: "Account created successfully.",
       user: {
-        name: data.name.trim(),
-        email: data.email.trim().toLowerCase(),
-        phone: data.phone,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        dateOfBirth: user.dateOfBirth,
+        age: age,
+        ageGroup: user.ageGroup,
+      },
+      wallet: {
+        balanceMinor: user.wallet?.balanceMinor ?? 0,
+        points: user.wallet?.points ?? 0,
+      },
+      cards: {
+        count: user._count.cards,
       },
       security: {
-        emailVerified: false,
-        phoneVerified: false,
-        identityVerified: false,
-      },
-      card: {
-        level: "BASIC",
-        status: "NOT_CREATED",
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
+        identityVerified: user.identityVerified,
       },
     };
   }
 
   async login(data: LoginDto) {
-    if (!data.email?.trim() || !data.password) {
+    const email = data.email?.trim().toLowerCase();
+
+    if (!email || !data.password) {
       throw new BadRequestException(
         "Email and password are required",
       );
     }
 
-    if (data.password.length < 8) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        wallet: true,
+        _count: {
+          select: {
+            cards: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
       throw new UnauthorizedException("Invalid credentials");
     }
 
+    const passwordValid = await this.verifyPassword(
+      data.password,
+      user.passwordHash,
+    );
+
+    if (!passwordValid) {
+      throw new UnauthorizedException("Invalid credentials");
+    }
+
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        email: user.email,
+      },
+      process.env.JWT_SECRET || "passcard-dev-secret",
+      { expiresIn: "7d" },
+    );
+
     return {
       success: true,
-      message: "Login request received.",
+      message: "Login successful.",
+      token,
       user: {
-        email: data.email.trim().toLowerCase(),
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        ageGroup: user.ageGroup,
+      },
+      wallet: {
+        balanceMinor: user.wallet?.balanceMinor ?? 0,
+        points: user.wallet?.points ?? 0,
+      },
+      cards: {
+        count: user._count.cards,
       },
       security: {
         authenticated: true,
-        emailVerified: false,
-        phoneVerified: false,
-        identityVerified: false,
+        emailVerified: user.emailVerified,
+        phoneVerified: user.phoneVerified,
+        identityVerified: user.identityVerified,
       },
     };
-  }
-
-  async google(credential: string) {
-    if (!credential?.trim()) {
-      throw new BadRequestException("Google credential is required");
-    }
-
-    try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: credential,
-        audience: GOOGLE_CLIENT_ID,
-      });
-
-      const payload = ticket.getPayload();
-
-      if (!payload?.sub || !payload.email) {
-        throw new UnauthorizedException(
-          "Invalid Google account information",
-        );
-      }
-
-      return {
-        success: true,
-        message: "Google authentication successful.",
-        user: {
-          id: payload.sub,
-          name: payload.name || "",
-          email: payload.email,
-          picture: payload.picture || "",
-        },
-        security: {
-          authenticated: true,
-          emailVerified: payload.email_verified === true,
-          phoneVerified: false,
-          identityVerified: false,
-        },
-      };
-    } catch {
-      throw new UnauthorizedException(
-        "Google authentication failed",
-      );
-    }
   }
 }
