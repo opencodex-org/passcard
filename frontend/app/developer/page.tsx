@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { API_URL } from "../api-url";
 
 export default function DeveloperPage() {
   const [created, setCreated] = useState(false);
@@ -99,7 +100,7 @@ export default function DeveloperPage() {
             </p>
 
             <code className="mt-2 block font-mono text-sm">
-              http://localhost:4000/api/v1
+              {API_URL}
             </code>
           </div>
         </section>

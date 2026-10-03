@@ -1,24 +1,34 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { GoogleLogin } from "@react-oauth/google";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://passcard-igfn.onrender.com/api/v1";
+import { useAuthSession } from "../auth-session";
+import { API_URL } from "../api-url";
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const submissionStarted = useRef(false);
+  const {
+    registrationEmail,
+    setSession,
+    setPendingEmail,
+    setRegistrationEmail,
+  } = useAuthSession();
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(registrationEmail || "");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(
+    registrationEmail ? "هذا البريد غير مسجل. أكمل إنشاء حسابك." : "",
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submissionStarted.current) return;
     setMessage("");
 
     if (!name.trim() || !email.trim() || !phone.trim() || !password) {
@@ -42,6 +52,7 @@ export default function RegisterPage() {
     }
 
     try {
+      submissionStarted.current = true;
       setLoading(true);
 
       const response = await fetch(`${API_URL}/auth/register`, {
@@ -63,13 +74,31 @@ export default function RegisterPage() {
         throw new Error(data?.message || "تعذر إنشاء الحساب.");
       }
 
-      setMessage("تم إنشاء الحساب بنجاح.");
+      setRegistrationEmail(null);
+      if (data.emailVerificationRequired) {
+        setPendingEmail(data.user.email);
+        setMessage("تم إنشاء الحساب، تحقق من بريدك الإلكتروني لإكمال التسجيل...");
+        window.setTimeout(() => router.push("/verify-email"), 500);
+        return;
+      }
+
+      if (!data.token || !data.user) {
+        throw new Error("تعذر إنشاء جلسة تسجيل الدخول.");
+      }
+
+      setPendingEmail(null);
+      setSession(data.token, {
+        ...data.user,
+        emailVerified: data.security?.emailVerified === true,
+      });
+      router.push("/dashboard");
     } catch (error) {
+      submissionStarted.current = false;
       setMessage(
         error instanceof Error ? error.message : "حدث خطأ غير متوقع."
       );
     } finally {
-      setLoading(false);
+      if (!submissionStarted.current) setLoading(false);
     }
   }
 

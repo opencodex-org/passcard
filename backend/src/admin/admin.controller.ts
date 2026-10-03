@@ -6,13 +6,14 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
-import { AuthGuard } from "../auth/auth.guard";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { AdminService } from "./admin.service";
 import { AdminReviewDto } from "./dto/admin-review.dto";
 import { AdminUserActionDto } from "./dto/admin-user-action.dto";
+import { AdminGuard } from "./admin.guard";
 
 @Controller("passcard-by-open-codex-admin_4hhh5d47j533fk73j")
-@UseGuards(AuthGuard)
+@UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

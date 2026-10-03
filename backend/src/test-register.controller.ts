@@ -1,10 +1,14 @@
-import { Controller, Get, Res } from "@nestjs/common";
+import { Controller, Get, NotFoundException, Res } from "@nestjs/common";
 import { Response } from "express";
 
 @Controller("test-register")
 export class TestRegisterController {
   @Get()
   page(@Res() res: Response) {
+    if (process.env.NODE_ENV === "production") {
+      throw new NotFoundException();
+    }
+
     res.type("html").send(`<!doctype html>
 <html lang="ar" dir="rtl">
 <head>

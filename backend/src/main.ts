@@ -1,6 +1,7 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { isCorsOriginAllowed } from "./cors";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -8,7 +9,11 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
 
   app.enableCors({
-    origin: true,
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void,
+    ) =>
+      callback(null, isCorsOriginAllowed(origin)),
     credentials: true,
   });
 

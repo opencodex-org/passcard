@@ -1,6 +1,7 @@
 "use client";
 
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { AuthSessionProvider } from "./auth-session";
 
 export default function Providers({
   children,
@@ -13,7 +14,7 @@ export default function Providers({
 
   return (
     <GoogleOAuthProvider clientId={clientId}>
-      {children}
+      <AuthSessionProvider>{children}</AuthSessionProvider>
     </GoogleOAuthProvider>
   );
 }

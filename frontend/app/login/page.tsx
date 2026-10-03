@@ -1,14 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { GoogleLogin } from "@react-oauth/google";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://passcard-igfn.onrender.com/api/v1";
+import { useAuthSession } from "../auth-session";
+import { API_URL } from "../api-url";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const loginStarted = useRef(false);
+  const {
+    setSession,
+    clearSession,
+    setPendingEmail,
+    setRegistrationEmail,
+  } = useAuthSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,6 +23,7 @@ export default function LoginPage() {
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loginStarted.current) return;
     setMessage("");
 
     if (!email.trim() || !password) {
@@ -24,6 +32,7 @@ export default function LoginPage() {
     }
 
     try {
+      loginStarted.current = true;
       setLoading(true);
 
       const response = await fetch(`${API_URL}/auth/login`, {
@@ -39,17 +48,43 @@ export default function LoginPage() {
 
       const data = await response.json().catch(() => null);
 
+      if (!response.ok && data?.message === "EMAIL_NOT_REGISTERED") {
+        clearSession();
+        setPendingEmail(null);
+        setRegistrationEmail(email.trim().toLowerCase());
+        setMessage("هذا البريد غير مسجل. أكمل إنشاء حسابك.");
+        router.push("/register");
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(data?.message || "تعذر تسجيل الدخول.");
       }
 
-      setMessage("تم تسجيل الدخول بنجاح.");
+      if (data?.emailVerificationRequired) {
+        clearSession();
+        setPendingEmail(data.email || email.trim().toLowerCase());
+        setMessage("تحقق من بريدك الإلكتروني لإكمال تسجيل الدخول...");
+        router.push("/verify-email");
+        return;
+      }
+
+      if (!data?.token || !data?.user) {
+        throw new Error("تعذر إنشاء جلسة تسجيل الدخول.");
+      }
+
+      setSession(data.token, {
+        ...data.user,
+        emailVerified: data.security?.emailVerified === true,
+      });
+      router.push("/dashboard");
     } catch (error) {
+      loginStarted.current = false;
       setMessage(
         error instanceof Error ? error.message : "حدث خطأ غير متوقع."
       );
     } finally {
-      setLoading(false);
+      if (!loginStarted.current) setLoading(false);
     }
   }
 

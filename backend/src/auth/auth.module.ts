@@ -5,17 +5,28 @@ import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtStrategy } from "./jwt.strategy";
 import { PrismaService } from "../prisma.service";
+import { getJwtSecret } from "./jwt-secret";
+import { EmailService } from "./email.service";
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || "passcard-dev-secret",
+      secret: getJwtSecret(),
       signOptions: { expiresIn: "7d" },
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PrismaService],
-  exports: [AuthService, JwtModule, PassportModule],
+  providers: [
+    AuthService,
+    EmailService,
+    JwtStrategy,
+    PrismaService,
+  ],
+  exports: [
+    AuthService,
+    JwtModule,
+    PassportModule,
+  ],
 })
 export class AuthModule {}

@@ -7,30 +7,32 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  name              String
-  email             String   @unique
-  phone             String   @unique
-  passwordHash      String
-  dateOfBirth       DateTime
-  ageGroup          String
-  gender            String?
-  emailVerified     Boolean  @default(false)
-  phoneVerified     Boolean  @default(false)
-  identityVerified  Boolean  @default(false)
-  role              String   @default("USER")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(uuid())
+  name             String
+  email            String   @unique
+  phone            String   @unique
+  passwordHash     String
+  dateOfBirth      DateTime
+  ageGroup         String
+  gender           String?
+  emailVerified    Boolean  @default(false)
+  phoneVerified    Boolean  @default(false)
+  identityVerified Boolean  @default(false)
+  role             String   @default("USER")
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  cards          Card[]
-  wallet         Wallet?
-  transactions   Transaction[]
-  payments       Payment[]
-  address        Address?
-  verifications  Verification[]
-  otpCodes       OtpCode[]
-  guardianLinks  GuardianLink[] @relation("Child")
-  children       GuardianLink[] @relation("Guardian")
+  cards         Card[]
+  wallet        Wallet?
+  transactions  Transaction[]  @relation("TransactionUser")
+  adminTopups   Transaction[]  @relation("AdminTopupActor")
+  payments      Payment[]
+  address       Address?
+  verifications Verification[]
+  otpCodes      OtpCode[]
+  guardianLinks GuardianLink[] @relation("Child")
+  children      GuardianLink[] @relation("Guardian")
 }
 
 model Address {
@@ -50,13 +52,13 @@ model Address {
 }
 
 model GuardianLink {
-  id             String   @id @default(uuid())
-  childId        String
-  guardianId     String
-  guardianPhone  String?
-  verified       Boolean  @default(false)
-  verifiedAt     DateTime?
-  createdAt      DateTime @default(now())
+  id            String    @id @default(uuid())
+  childId       String
+  guardianId    String
+  guardianPhone String?
+  verified      Boolean   @default(false)
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
 
   child    User @relation("Child", fields: [childId], references: [id], onDelete: Cascade)
   guardian User @relation("Guardian", fields: [guardianId], references: [id], onDelete: Cascade)
@@ -93,12 +95,43 @@ model Card {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cardLevel CardLevel @relation(fields: [cardLevelId], references: [id])
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardLevel CardLevel     @relation(fields: [cardLevelId], references: [id])
+  payments  Payment[]
+  topups    Transaction[] @relation("TopupCard")
 
   @@index([userId])
   @@index([cardLevelId])
   @@index([countryCode])
+}
+
+model Merchant {
+  id           String   @id @default(uuid())
+  name         String
+  businessName String
+  merchantCode String   @unique
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cashiers Cashier[]
+  payments Payment[]
+}
+
+model Cashier {
+  id         String   @id @default(uuid())
+  merchantId String
+  name       String
+  code       String
+  status     String   @default("ACTIVE")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  merchant Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([merchantId, code])
+  @@index([merchantId])
 }
 
 model Wallet {
@@ -114,22 +147,30 @@ model Wallet {
 }
 
 model Transaction {
-  id          String   @id @default(uuid())
-  userId      String
-  walletId    String
-  amountMinor Int
-  type        String
-  status      String   @default("PENDING")
-  reference   String?  @unique
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  userId         String
+  walletId       String
+  adminId        String?
+  cardId         String?
+  idempotencyKey String?  @unique
+  amountMinor    Int
+  type           String
+  status         String   @default("PENDING")
+  reference      String?  @unique
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation("TransactionUser", fields: [userId], references: [id], onDelete: Cascade)
+  admin  User?  @relation("AdminTopupActor", fields: [adminId], references: [id], onDelete: SetNull)
+  card   Card?  @relation("TopupCard", fields: [cardId], references: [id], onDelete: SetNull)
   wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([walletId])
+  @@index([adminId])
+  @@index([cardId])
+  @@index([type, createdAt])
 }
 
 model Reward {
@@ -143,15 +184,15 @@ model Reward {
 }
 
 model Verification {
-  id                String   @id @default(uuid())
-  userId            String
-  nationalId        String?
-  identityImageUrl  String?
-  selfieImageUrl    String?
-  status            String   @default("PENDING")
-  reviewedAt        DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String    @id @default(uuid())
+  userId           String
+  nationalId       String?
+  identityImageUrl String?
+  selfieImageUrl   String?
+  status           String    @default("PENDING")
+  reviewedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -159,14 +200,14 @@ model Verification {
 }
 
 model OtpCode {
-  id         String   @id @default(uuid())
-  userId     String
-  purpose    String
-  codeHash   String
-  expiresAt  DateTime
-  attempts   Int      @default(0)
-  usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(uuid())
+  userId    String
+  purpose   String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -175,7 +216,10 @@ model OtpCode {
 
 model Payment {
   id                String   @id @default(uuid())
-  userId            String
+  userId            String?
+  cardId            String?
+  merchantId        String?
+  cashierId         String?
   amountMinor       Int
   currency          String   @default("SAR")
   provider          String
@@ -185,5 +229,13 @@ model Payment {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card     Card?     @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  merchant Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+  cashier  Cashier?  @relation(fields: [cashierId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([cardId])
+  @@index([merchantId])
+  @@index([cashierId])
 }

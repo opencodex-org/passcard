@@ -1,4 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthSession } from "../auth-session";
 
 const stats = [
   {
@@ -24,6 +29,25 @@ const stats = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { accessToken, user } = useAuthSession();
+
+  useEffect(() => {
+    if (!accessToken) {
+      router.replace("/login");
+    } else if (!user?.emailVerified) {
+      router.replace("/verify-email");
+    }
+  }, [accessToken, router, user?.emailVerified]);
+
+  if (!accessToken || !user?.emailVerified) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-6 text-gray-600">
+        جارٍ التحقق من الجلسة...
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-10">
       <div className="mx-auto max-w-6xl">
