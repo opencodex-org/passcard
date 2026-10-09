@@ -7,9 +7,23 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 export class CardsController {
   constructor(private readonly cardsService: CardsService) {}
 
+  @Get("options")
+  options() {
+    return this.cardsService.findOptions();
+  }
+
+  @Get("levels")
+  levels() {
+    return this.cardsService.findLevels();
+  }
+
   @Post()
-  create(@Req() req: any, @Body() body: { cardLevelId: string }) {
-    return this.cardsService.create(req.user.userId, body.cardLevelId);
+  create(
+    @Req() req: any,
+    @Body()
+    body: { cardLevelId: string; countryCode?: string; cardType?: string },
+  ) {
+    return this.cardsService.create(req.user.userId, body);
   }
 
   @Get("mine")
