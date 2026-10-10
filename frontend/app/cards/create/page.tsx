@@ -68,7 +68,6 @@ const [message, setMessage] = useState("");
 useEffect(() => {
 let cancelled = false;
 
-```
 async function loadOptions() {
   try {
     setLoadingLevels(true);
@@ -130,7 +129,6 @@ void loadOptions();
 return () => {
   cancelled = true;
 };
-```
 
 }, [accessToken]);
 
@@ -145,7 +143,6 @@ setError("");
 setMessage("");
 setCreatedRequest(null);
 
-```
 if (!accessToken) {
   setError("سجّل الدخول أولًا حتى يرتبط طلب البطاقة بحسابك.");
   return;
@@ -188,7 +185,6 @@ try {
 } finally {
   setLoading(false);
 }
-```
 
 }
 
@@ -196,7 +192,6 @@ return ( <main className="min-h-screen bg-gray-50 px-6 py-10"> <div className="m
 خصّص البطاقة وأرسل طلبك. ستبقى غير مفعّلة حتى تراجع الإدارة الطلب
 وتوافق عليه. </p> </header>
 
-```
     {!accessToken && (
       <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
         يلزم تسجيل الدخول قبل إرسال الطلب.{" "}
@@ -437,7 +432,6 @@ return ( <main className="min-h-screen bg-gray-50 px-6 py-10"> <div className="m
     )}
   </div>
 </main>
-```
 
 );
 }
