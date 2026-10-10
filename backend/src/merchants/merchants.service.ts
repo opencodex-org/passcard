@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma.service";
 import { CreateMerchantDto } from "./dto/create-merchant.dto";
 import { CreateMerchantPaymentDto } from "./dto/create-merchant-payment.dto";
@@ -44,12 +45,14 @@ export class MerchantsService {
     });
     if (!cashier) throw new NotFoundException("Cashier not found");
 
+    const checkoutToken = randomBytes(32).toString("base64url");
     return this.prisma.payment.create({
       data: {
         amountMinor: data.amountMinor,
         currency: "SAR",
-        provider: "PASSCARD_MAX",
+        provider: "PASSCARD_INTERNAL_WALLET_SANDBOX",
         status: "PENDING",
+        checkoutToken,
         merchantId: merchant.id,
         cashierId: cashier.id,
       },

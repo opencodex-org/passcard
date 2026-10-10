@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -30,8 +31,11 @@ export class PaymentsController {
   }
 
   @Get("pending")
-  pending(@Req() request: AuthenticatedRequest) {
-    return this.paymentsService.findPending(request.user.userId);
+  pending(
+    @Req() request: AuthenticatedRequest,
+    @Query("checkoutToken") checkoutToken?: string,
+  ) {
+    return this.paymentsService.findPending(request.user.userId, checkoutToken);
   }
 
   @Post(":paymentId/select-card")

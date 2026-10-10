@@ -20,6 +20,7 @@ function paymentPrisma() {
     payment: {
       create: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       updateMany: jest.fn(),
       findUniqueOrThrow: jest.fn(),
     },
@@ -48,6 +49,35 @@ describe("PaymentsService", () => {
     );
   });
 
+  it("does not expose unclaimed merchant payments without their checkout token", async () => {
+    const prisma = paymentPrisma();
+    prisma.payment.findMany.mockResolvedValue([]);
+
+    await new PaymentsService(prisma).findPending("user-1");
+
+    expect(prisma.payment.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { status: "PENDING", userId: "user-1" },
+    }));
+  });
+
+  it("uses a private checkout token and preserves access after card selection", async () => {
+    const prisma = paymentPrisma();
+    prisma.payment.findFirst.mockResolvedValue(pendingPayment);
+
+    const result = await new PaymentsService(prisma).findPending(
+      "user-1", "a-valid-random-checkout-token-value-1234567890",
+    );
+
+    expect(result).toEqual([pendingPayment]);
+    expect(prisma.payment.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        checkoutToken: "a-valid-random-checkout-token-value-1234567890",
+        status: "PENDING",
+        OR: [{ userId: null }, { userId: "user-1" }],
+      }),
+    }));
+  });
+
   it("rejects selecting a card owned by another user", async () => {
     const prisma = paymentPrisma();
     prisma.card.findFirst.mockResolvedValue(null);
@@ -63,6 +93,7 @@ describe("PaymentsService", () => {
   it("selects an active owned card and keeps the payment pending", async () => {
     const prisma = paymentPrisma();
     prisma.card.findFirst.mockResolvedValue(card);
+    prisma.payment.findFirst.mockResolvedValue(pendingPayment);
     prisma.payment.updateMany.mockResolvedValue({ count: 1 });
     prisma.payment.findUniqueOrThrow.mockResolvedValue(pendingPayment);
 

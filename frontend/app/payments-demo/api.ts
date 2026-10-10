@@ -35,9 +35,14 @@ export type LoginResponse = {
 
 export type Card = {
   id: string;
-  cardNumber: string;
+  cardNumber: string | null;
   status: string;
-  cardLevel?: { name: string };
+  cardName?: string | null;
+  description?: string | null;
+  designColor?: string | null;
+  imageUrl?: string | null;
+  reviewReason?: string | null;
+  cardLevel?: { id?: string; name: string; priceMinor?: number };
 };
 
 export type Merchant = {
@@ -57,6 +62,7 @@ export type Payment = {
   currency: string;
   status: string;
   provider: string;
+  checkoutToken?: string | null;
   merchant?: Merchant | null;
   cashier?: Cashier | null;
 };

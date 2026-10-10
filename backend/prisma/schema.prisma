@@ -24,6 +24,7 @@ model User {
   updatedAt        DateTime @updatedAt
 
   cards         Card[]
+  reviewedCards Card[] @relation("CardReviewer")
   wallet        Wallet?
   transactions  Transaction[]  @relation("TransactionUser")
   adminTopups   Transaction[]  @relation("AdminTopupActor")
@@ -86,23 +87,32 @@ model Card {
   id           String   @id @default(uuid())
   userId       String
   cardLevelId  String
-  cardNumber   String   @unique
+  cardNumber   String?  @unique
   ageGroup     String
+  cardName     String?
+  description  String?
+  designColor  String?
+  imageUrl     String?
+  reviewReason String?
+  reviewedAt   DateTime?
+  reviewedById String?
   countryCode  String   @default("SA")
   currency     String   @default("SAR")
   cardType     String   @default("VIRTUAL")
-  status       String   @default("ACTIVE")
+  status       String   @default("PENDING")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cardLevel CardLevel     @relation(fields: [cardLevelId], references: [id])
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardLevel  CardLevel     @relation(fields: [cardLevelId], references: [id])
+  reviewedBy User?         @relation("CardReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   payments  Payment[]
   topups    Transaction[] @relation("TopupCard")
 
   @@index([userId])
   @@index([cardLevelId])
   @@index([countryCode])
+  @@index([reviewedById])
 }
 
 model Merchant {
@@ -224,6 +234,7 @@ model Payment {
   currency          String   @default("SAR")
   provider          String
   providerPaymentId String?  @unique
+  checkoutToken     String?  @unique
   transactionId     String?  @unique
   status            String   @default("PENDING")
   createdAt         DateTime @default(now())

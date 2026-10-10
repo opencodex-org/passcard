@@ -39,7 +39,7 @@ export class PaymentsService {
         cardId: card.id,
         amountMinor: data.amountMinor,
         currency: "SAR",
-        provider: "PASSCARD_MAX",
+        provider: "PASSCARD_INTERNAL_WALLET_SANDBOX",
         status: "PENDING",
       },
       include: { card: true },
@@ -68,6 +68,9 @@ export class PaymentsService {
     }
     if (!payment.cardId) {
       throw new BadRequestException("Select a card before confirming payment");
+    }
+    if (!payment.card || payment.card.status !== "ACTIVE") {
+      throw new BadRequestException("Selected card is not active");
     }
 
     if (data.confirmation === "NO") {
@@ -147,12 +150,22 @@ export class PaymentsService {
     });
   }
 
-  findPending(userId: string) {
+  async findPending(userId: string, checkoutToken?: string) {
+    if (checkoutToken) {
+      const payment = await this.prisma.payment.findFirst({
+        where: {
+          checkoutToken,
+          status: "PENDING",
+          OR: [{ userId: null }, { userId }],
+        },
+        include: { card: true, merchant: true, cashier: true },
+      });
+      return payment ? [payment] : [];
+    }
+
+    // Without a checkout token, only show a user's own pending payments.
     return this.prisma.payment.findMany({
-      where: {
-        status: "PENDING",
-        OR: [{ userId }, { userId: null }],
-      },
+      where: { status: "PENDING", userId },
       include: { card: true, merchant: true, cashier: true },
       orderBy: { createdAt: "asc" },
     });
@@ -171,12 +184,28 @@ export class PaymentsService {
       throw new NotFoundException("Active card not found for user");
     }
 
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        id: paymentId,
+        status: "PENDING",
+        cardId: null,
+        OR: [
+          { userId },
+          ...(data.checkoutToken ? [{ userId: null, checkoutToken: data.checkoutToken }] : []),
+        ],
+      },
+      select: { id: true, userId: true, checkoutToken: true },
+    });
+    if (!payment) throw new NotFoundException("Payment not found for this checkout");
+
     const selected = await this.prisma.payment.updateMany({
       where: {
         id: paymentId,
         status: "PENDING",
-        userId: null,
         cardId: null,
+        ...(payment.userId === null
+          ? { userId: null, checkoutToken: data.checkoutToken }
+          : { userId }),
       },
       data: { userId, cardId: card.id },
     });

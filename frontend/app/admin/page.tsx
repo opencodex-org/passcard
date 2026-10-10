@@ -32,6 +32,38 @@ type TopupRecord = {
   card: { maskedNumber: string; status: string } | null;
 };
 
+type CardRequestRecord = {
+  id: string;
+  cardName: string | null;
+  description: string | null;
+  designColor: string | null;
+  imageUrl: string | null;
+  status: string;
+  createdAt: string;
+  user: { id: string; name: string; email: string; phone: string };
+  cardLevel: { id: string; name: string; priceMinor: number };
+};
+
+type UserTopupRequest = {
+  id: string;
+  userId: string;
+  amountMinor: number;
+  status: string;
+  description: string | null;
+  createdAt: string;
+  user: { name: string; email: string; phone: string };
+};
+
+type CardLevelRecord = {
+  id: string;
+  name: string;
+  description: string | null;
+  priceMinor: number;
+  color: string | null;
+  imageUrl: string | null;
+  active: boolean;
+};
+
 type TopupResult = {
   topup: { id: string; reference: string; amountMinor: number };
   balanceMinor: number;
@@ -63,7 +95,7 @@ function formatMoney(amountMinor: number) {
   return `${whole}.${fraction} ر.س`;
 }
 
-function parseAmountToMinor(value: string): number | null {
+function parseAmountToMinor(value: string, allowZero = false): number | null {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.trim());
   if (!match) return null;
 
@@ -72,7 +104,7 @@ function parseAmountToMinor(value: string): number | null {
   if (!Number.isSafeInteger(whole)) return null;
 
   const amountMinor = whole * 100 + fraction;
-  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMinor > 2147483647) {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor < (allowZero ? 0 : 1) || amountMinor > 2147483647) {
     return null;
   }
   return amountMinor;
@@ -89,6 +121,14 @@ export default function AdminTopupPage() {
   const [cardId, setCardId] = useState("");
   const [amountSar, setAmountSar] = useState("25");
   const [history, setHistory] = useState<TopupRecord[]>([]);
+  const [pendingCardRequests, setPendingCardRequests] = useState<CardRequestRecord[]>([]);
+  const [pendingTopupRequests, setPendingTopupRequests] = useState<UserTopupRequest[]>([]);
+  const [cardLevels, setCardLevels] = useState<CardLevelRecord[]>([]);
+  const [levelName, setLevelName] = useState("");
+  const [levelDescription, setLevelDescription] = useState("");
+  const [levelPrice, setLevelPrice] = useState("0.00");
+  const [levelColor, setLevelColor] = useState("#111111");
+  const [levelImageUrl, setLevelImageUrl] = useState("");
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [result, setResult] = useState<TopupResult | null>(null);
   const [error, setError] = useState("");
@@ -107,10 +147,18 @@ export default function AdminTopupPage() {
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.message || "تعذر تسجيل الدخول.");
-      const topups = await api<TopupRecord[]>("/admin/topups", body.token);
+      const [topups, cardRequests, topupRequests, levels] = await Promise.all([
+        api<TopupRecord[]>("/admin/topups", body.token),
+        api<CardRequestRecord[]>("/admin/card-requests", body.token),
+        api<UserTopupRequest[]>("/admin/topup-requests", body.token),
+        api<CardLevelRecord[]>("/admin/card-levels", body.token),
+      ]);
       setToken(body.token);
       setHistory(topups);
-      setSuccess("تم تسجيل الدخول.");
+      setPendingCardRequests(cardRequests);
+      setPendingTopupRequests(topupRequests);
+      setCardLevels(levels);
+      setSuccess("تم تسجيل الدخول وتحميل قوائم الإدارة.");
     });
   }
 
@@ -145,8 +193,72 @@ export default function AdminTopupPage() {
     setHistory(entries);
   }
 
+  async function loadAdminQueues(activeToken = token) {
+    const [cardRequests, topupRequests, levels] = await Promise.all([
+      api<CardRequestRecord[]>("/admin/card-requests", activeToken),
+      api<UserTopupRequest[]>("/admin/topup-requests", activeToken),
+      api<CardLevelRecord[]>("/admin/card-levels", activeToken),
+    ]);
+    setPendingCardRequests(cardRequests);
+    setPendingTopupRequests(topupRequests);
+    setCardLevels(levels);
+  }
+
+  async function reviewCardRequest(requestId: string, decision: "APPROVED" | "REJECTED") {
+    let reason: string | undefined;
+    if (decision === "REJECTED") {
+      reason = window.prompt("اكتب سبب رفض طلب البطاقة:")?.trim() || "";
+      if (!reason) { setError("رفض الطلب يتطلب كتابة السبب."); return; }
+    }
+    await run(async () => {
+      await api(`/admin/card-requests/${requestId}/review`, token, {
+        method: "POST", body: JSON.stringify({ decision, reason }),
+      });
+      await loadAdminQueues();
+      setSuccess(decision === "APPROVED" ? "تمت الموافقة وإصدار الرقم الداخلي للبطاقة." : "تم رفض طلب البطاقة وتسجيل السبب.");
+    });
+  }
+
+  async function reviewTopupRequest(requestId: string, decision: "APPROVED" | "REJECTED") {
+    let reason: string | undefined;
+    if (decision === "REJECTED") {
+      reason = window.prompt("اكتب سبب رفض طلب الشحن:")?.trim() || "";
+      if (!reason) { setError("رفض الطلب يتطلب كتابة السبب."); return; }
+    }
+    await run(async () => {
+      await api(`/admin/topup-requests/${requestId}/review`, token, {
+        method: "POST", body: JSON.stringify({ decision, reason }),
+      });
+      await Promise.all([loadAdminQueues(), loadHistory()]);
+      setSuccess(decision === "APPROVED" ? "تمت الموافقة وإضافة الرصيد في معاملة واحدة." : "تم رفض طلب الشحن وتسجيل السبب.");
+    });
+  }
+
+  async function createCardLevel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const priceMinor = parseAmountToMinor(levelPrice, true);
+    if (priceMinor === null) {
+      setError("اكتب سعرًا صحيحًا. يمكن إدخال 0.00 إذا كان المستوى مجانيًا.");
+      return;
+    }
+    await run(async () => {
+      await api<CardLevelRecord>("/admin/card-levels", token, {
+        method: "POST",
+        body: JSON.stringify({
+          name: levelName.trim(), description: levelDescription.trim() || undefined,
+          priceMinor, color: levelColor,
+          imageUrl: levelImageUrl.trim() || undefined,
+        }),
+      });
+      await loadAdminQueues();
+      setLevelName(""); setLevelDescription(""); setLevelPrice("0.00");
+      setLevelColor("#111111"); setLevelImageUrl("");
+      setSuccess("تم إنشاء مستوى البطاقة في قاعدة البيانات.");
+    });
+  }
+
   async function confirmTopup() {
-    if (!selectedUser || !cardId || requestInFlight.current) return;
+    if (!selectedUser || requestInFlight.current) return;
     const amountMinor = parseAmountToMinor(amountSar);
     if (amountMinor === null) {
       setError("أدخل مبلغاً صحيحاً أكبر من صفر وبحد أقصى منزلتين عشريتين.");
@@ -160,7 +272,7 @@ export default function AdminTopupPage() {
         method: "POST",
         body: JSON.stringify({
           userId: selectedUser.id,
-          cardId,
+          cardId: cardId || undefined,
           amountMinor,
           idempotencyKey: idempotencyKey.current || crypto.randomUUID(),
         }),
@@ -228,8 +340,8 @@ export default function AdminTopupPage() {
               {users.length > 0 && <div className="pending-list topup-user-list">{users.map((user) => <button type="button" key={user.id} className={`pending-card ${selectedUser?.id === user.id ? "selected" : ""}`} onClick={() => void chooseUser(user)} disabled={loading}><span className="status-dot" /><span><strong>{user.name}</strong><small>{user.email} · {user.status}</small></span><b>اختيار</b></button>)}</div>}
               {users.length === 0 && <div className="empty-state topup-empty">ابحث عن مستخدم لعرض بطاقاته.</div>}
               {selectedUser && <div className="stack-form topup-card-picker">
-                <div className="record-chip">المستخدم: {selectedUser.name} · {selectedUser.email}</div>
-                <label>بطاقة المستخدم<select value={cardId} onChange={(event) => setCardId(event.target.value)}><option value="">اختر بطاقة نشطة</option>{cards.map((card) => <option key={card.id} value={card.id}>{card.cardLevel.name} · {card.maskedNumber}</option>)}</select></label>
+                <div className="record-chip">المستخدم: {selectedUser.name} · {selectedUser.email}<small>يمكن إضافة الرصيد إلى المحفظة مباشرة، وربطه ببطاقة نشطة اختياري.</small></div>
+                <label>بطاقة المستخدم<select value={cardId} onChange={(event) => setCardId(event.target.value)}><option value="">شحن المحفظة دون ربط ببطاقة</option>{cards.map((card) => <option key={card.id} value={card.id}>{card.cardLevel.name} · {card.maskedNumber}</option>)}</select></label>
                 {cards.length === 0 && <div className="empty-state">لا توجد بطاقة نشطة لهذا المستخدم.</div>}
               </div>}
             </section>
@@ -239,19 +351,44 @@ export default function AdminTopupPage() {
               <div className="stack-form">
                 <label>المبلغ بالريال<input type="number" min="0.01" step="0.01" value={amountSar} onChange={(event) => setAmountSar(event.target.value)} /></label>
                 <div className="summary-line"><span>قيمة الإضافة</span><strong>{parseAmountToMinor(amountSar) === null ? "—" : formatMoney(parseAmountToMinor(amountSar)!)}</strong></div>
-                <button className="primary-button" onClick={() => { setError(""); idempotencyKey.current = crypto.randomUUID(); setConfirmationOpen(true); }} disabled={loading || !selectedUser || !cardId || parseAmountToMinor(amountSar) === null}>إضافة رصيد</button>
+                <button className="primary-button" onClick={() => { setError(""); idempotencyKey.current = crypto.randomUUID(); setConfirmationOpen(true); }} disabled={loading || !selectedUser || parseAmountToMinor(amountSar) === null}>إضافة رصيد</button>
               </div>
               {result && <div className="payment-ticket topup-result"><span className="status-dot" /><div><strong>تمت العملية · {formatMoney(result.topup.amountMinor)}</strong><small>المرجع: {result.topup.reference}</small><small>الرصيد الجديد: {formatMoney(result.balanceMinor)}</small></div></div>}
             </section>
           </div>
         )}
 
-        {confirmationOpen && <div className="topup-confirm-backdrop" role="presentation"><section className="demo-panel topup-confirm" role="dialog" aria-modal="true" aria-labelledby="topup-confirm-title"><div className="panel-heading"><span className="step-number accent">!</span><div><h2 id="topup-confirm-title">تأكيد إضافة الرصيد</h2><p>راجع المستفيد والبطاقة والمبلغ قبل التنفيذ.</p></div></div><div className="checkout-summary"><div><span>المستخدم</span><strong>{selectedUser?.name}</strong></div><div><span>البطاقة</span><strong>{cards.find((card) => card.id === cardId)?.maskedNumber}</strong></div><div><span>المبلغ</span><strong>{formatMoney(parseAmountToMinor(amountSar) || 0)}</strong></div></div><div className="confirm-actions"><button className="confirm-yes" onClick={() => void confirmTopup()} disabled={loading}>{loading ? "جارٍ الإضافة..." : "تأكيد الشحن"}</button><button className="confirm-no" onClick={() => { idempotencyKey.current = null; setConfirmationOpen(false); }} disabled={loading}>رجوع</button></div></section></div>}
+        {confirmationOpen && <div className="topup-confirm-backdrop" role="presentation"><section className="demo-panel topup-confirm" role="dialog" aria-modal="true" aria-labelledby="topup-confirm-title"><div className="panel-heading"><span className="step-number accent">!</span><div><h2 id="topup-confirm-title">تأكيد إضافة الرصيد</h2><p>راجع المستفيد والبطاقة والمبلغ قبل التنفيذ.</p></div></div><div className="checkout-summary"><div><span>المستخدم</span><strong>{selectedUser?.name}</strong></div><div><span>البطاقة</span><strong>{cards.find((card) => card.id === cardId)?.maskedNumber || "المحفظة مباشرة"}</strong></div><div><span>المبلغ</span><strong>{formatMoney(parseAmountToMinor(amountSar) || 0)}</strong></div></div><div className="confirm-actions"><button className="confirm-yes" onClick={() => void confirmTopup()} disabled={loading}>{loading ? "جارٍ الإضافة..." : "تأكيد الشحن"}</button><button className="confirm-no" onClick={() => { idempotencyKey.current = null; setConfirmationOpen(false); }} disabled={loading}>رجوع</button></div></section></div>}
 
         {error && <div className="demo-message topup-error" role="alert">{error}</div>}
         {success && <div className="demo-message" role="status">{success}</div>}
 
         {token && <section className="demo-panel topup-history"><div className="panel-heading"><span className="step-number">03</span><div><h2>سجل عمليات الشحن</h2><p>آخر 100 عملية مسجلة في دفتر المعاملات.</p></div></div>{history.length === 0 ? <div className="empty-state">لا توجد عمليات شحن بعد.</div> : <div className="topup-table-wrap"><table className="topup-table"><thead><tr><th>المستخدم</th><th>البطاقة</th><th>المبلغ</th><th>المرجع</th><th>التاريخ</th></tr></thead><tbody>{history.map((item) => <tr key={item.id}><td>{item.user.name}<small>{item.user.email}</small></td><td>{item.card?.maskedNumber || "—"}</td><td>{formatMoney(item.amountMinor)}</td><td>{item.reference}</td><td>{new Date(item.createdAt).toLocaleString("ar-SA")}</td></tr>)}</tbody></table></div>}</section>}
+
+
+
+        {token && <section className="demo-panel topup-history">
+          <div className="panel-heading"><span className="step-number accent">04</span><div><h2>طلبات البطاقات</h2><p>تظهر الطلبات المحفوظة بحالة PENDING فقط. الموافقة تصدر رقمًا داخليًا؛ ليست إصدارًا مصرفيًا.</p></div></div>
+          {pendingCardRequests.length === 0 ? <div className="empty-state">لا توجد طلبات بطاقات تنتظر المراجعة.</div> : <div className="pending-list">{pendingCardRequests.map((item) => <article key={item.id} className="pending-card" style={{ alignItems: "flex-start" }}><span className="status-dot" style={{ background: item.designColor || "#111111" }} /><span style={{ minWidth: 0, flex: 1 }}><strong>{item.cardName || item.cardLevel.name}</strong><small>{item.user.name} · {item.user.email} · {item.user.phone}</small><small>المستوى: {item.cardLevel.name} · {formatMoney(item.cardLevel.priceMinor)}</small>{item.description && <small>{item.description}</small>}{item.imageUrl && <small>رابط الصورة: {item.imageUrl}</small>}<small>{new Date(item.createdAt).toLocaleString("ar-SA")}</small><span className="confirm-actions"><button type="button" className="confirm-yes" onClick={() => void reviewCardRequest(item.id, "APPROVED")} disabled={loading}>موافقة</button><button type="button" className="confirm-no" onClick={() => void reviewCardRequest(item.id, "REJECTED")} disabled={loading}>رفض</button></span></span></article>)}</div>}
+        </section>}
+
+        {token && <section className="demo-panel topup-history">
+          <div className="panel-heading"><span className="step-number accent">05</span><div><h2>طلبات شحن الرصيد</h2><p>لن يتغير الرصيد إلا بعد قبول الطلب. التنفيذ وتحديث المعاملة يتمان داخل معاملة قاعدة بيانات.</p></div></div>
+          {pendingTopupRequests.length === 0 ? <div className="empty-state">لا توجد طلبات شحن تنتظر المراجعة.</div> : <div className="topup-table-wrap"><table className="topup-table"><thead><tr><th>المستخدم</th><th>المبلغ</th><th>التاريخ</th><th>القرار</th></tr></thead><tbody>{pendingTopupRequests.map((item) => <tr key={item.id}><td>{item.user.name}<small>{item.user.email} · {item.user.phone}</small></td><td>{formatMoney(item.amountMinor)}</td><td>{new Date(item.createdAt).toLocaleString("ar-SA")}</td><td><div className="confirm-actions"><button type="button" className="confirm-yes" onClick={() => void reviewTopupRequest(item.id, "APPROVED")} disabled={loading}>موافقة</button><button type="button" className="confirm-no" onClick={() => void reviewTopupRequest(item.id, "REJECTED")} disabled={loading}>رفض</button></div></td></tr>)}</tbody></table></div>}
+        </section>}
+
+        {token && <section className="demo-panel topup-history">
+          <div className="panel-heading"><span className="step-number">06</span><div><h2>مستويات البطاقات</h2><p>إضافة المستويات والأسعار الفعلية التي تظهر للمستخدمين. القيم تحفظ بالهللات.</p></div></div>
+          <form className="stack-form" onSubmit={createCardLevel}>
+            <label>اسم المستوى<input value={levelName} onChange={(event) => setLevelName(event.target.value)} required maxLength={60} placeholder="اسم المستوى" /></label>
+            <label>الوصف<input value={levelDescription} onChange={(event) => setLevelDescription(event.target.value)} maxLength={500} /></label>
+            <label>السعر بالريال<input type="number" min="0" step="0.01" value={levelPrice} onChange={(event) => setLevelPrice(event.target.value)} required /></label>
+            <label>لون البطاقة<input type="color" value={levelColor} onChange={(event) => setLevelColor(event.target.value)} /></label>
+            <label>رابط صورة HTTPS<input type="url" value={levelImageUrl} onChange={(event) => setLevelImageUrl(event.target.value)} placeholder="https://…" /></label>
+            <button className="primary-button" disabled={loading}>إضافة المستوى</button>
+          </form>
+          {cardLevels.length === 0 ? <div className="empty-state">لا توجد مستويات بعد.</div> : <div className="topup-table-wrap"><table className="topup-table"><thead><tr><th>المستوى</th><th>السعر</th><th>الحالة</th></tr></thead><tbody>{cardLevels.map((level) => <tr key={level.id}><td><span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 99, backgroundColor: level.color || "#111111", marginInlineEnd: 8 }} />{level.name}<small>{level.description || "—"}</small></td><td>{formatMoney(level.priceMinor)}</td><td>{level.active ? "نشط" : "غير نشط"}</td></tr>)}</tbody></table></div>}
+        </section>}
 
         <footer className="demo-footer">PassCard Admin <span>لا يتم تخزين PAN كامل أو CVV أو PIN.</span></footer>
       </div>

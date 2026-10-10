@@ -80,7 +80,7 @@ export default function MerchantPage() {
         }),
       }, token);
       setPayment(data);
-      setMessage("تم إنشاء طلب الدفع. انتظر تأكيد المستخدم.");
+      setMessage("تم إنشاء رابط checkout خاص لهذا الطلب. الدفع الحالي من رصيد PassCard الداخلي (Sandbox) فقط.");
     });
   }
 
@@ -108,7 +108,7 @@ export default function MerchantPage() {
           <div>
             <p className="eyebrow">Merchant console / 01</p>
             <h1>ابدأ طلب الدفع من نقطة البيع.</h1>
-            <p className="hero-copy">أنشئ طلباً بمبلغ بالريال السعودي واترك للمستخدم اختيار بطاقته وتأكيد العملية.</p>
+            <p className="hero-copy">أنشئ رابط checkout خاصًا؛ هذه النسخة تجريبية وتخصم من رصيد PassCard الداخلي فقط.</p>
           </div>
           <div className="hero-stamp"><strong>MAX</strong><span>PASSCARD<br />PAYMENT</span></div>
         </section>
@@ -124,16 +124,16 @@ export default function MerchantPage() {
 
         <div className="demo-columns">
           <section className="demo-panel">
-            <div className="panel-heading"><span className="step-number">02</span><div><h2>بيانات التاجر والكاشير</h2><p>أنشئ سجلاً جديداً أو استخدم المعرّفات الموجودة.</p></div></div>
+            <div className="panel-heading"><span className="step-number">02</span><div><h2>بيانات التاجر والكاشير</h2><p>إنشاء سجلات التاجر والكاشير محصور بالإدارة؛ أدخل المعرّفات الموجودة لإنشاء طلب دفع تجريبي.</p></div></div>
             <form onSubmit={createMerchant} className="stack-form">
               <div className="field-grid two-col"><label>اسم التاجر<input value={merchantName} onChange={(e) => setMerchantName(e.target.value)} placeholder="متجر النخبة" required /></label><label>اسم النشاط<input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Elite Store" required /></label></div>
               <div className="field-grid two-col"><label>رمز التاجر<input value={merchantCode} onChange={(e) => setMerchantCode(e.target.value)} placeholder="ELITE-001" required /></label><label>Merchant ID<input value={merchantId} onChange={(e) => setMerchantId(e.target.value)} placeholder="استخدم ID موجوداً" /></label></div>
-              <button className="secondary-button" disabled={!token || loading}>إنشاء تاجر</button>
+              <button type="button" className="secondary-button" disabled>إنشاء التاجر — للإدارة فقط</button>
             </form>
             <form onSubmit={createCashier} className="stack-form divider-top">
               <div className="field-grid two-col"><label>اسم الكاشير<input value={cashierName} onChange={(e) => setCashierName(e.target.value)} placeholder="أحمد" required /></label><label>رمز الكاشير<input value={cashierCode} onChange={(e) => setCashierCode(e.target.value)} placeholder="C-01" required /></label></div>
               <div className="field-grid two-col"><label>Cashier ID<input value={cashierId} onChange={(e) => setCashierId(e.target.value)} placeholder="استخدم ID موجوداً" /></label><div className="record-chip">{merchant ? `تاجر نشط: ${merchant.name}` : "لم يتم اختيار تاجر"}{cashier ? ` · كاشير: ${cashier.code}` : ""}</div></div>
-              <button className="secondary-button" disabled={!token || loading}>إنشاء كاشير</button>
+              <button type="button" className="secondary-button" disabled>إنشاء الكاشير — للإدارة فقط</button>
             </form>
           </section>
 
@@ -144,7 +144,7 @@ export default function MerchantPage() {
               <div className="summary-line"><span>سيتم إنشاء الطلب بقيمة</span><strong>{money(Math.round(Number(amount || 0) * 100))}</strong></div>
               <button className="primary-button" disabled={!token || !merchantId || !cashierId || loading}>إنشاء طلب الدفع</button>
             </form>
-            {payment && <div className="payment-ticket"><span className="status-dot pending-dot" /> <div><strong>الطلب قيد الانتظار</strong><small>Payment ID: {payment.id}</small><small>الحالة: {payment.status}</small><small>تاجر: {merchant?.businessName || "تم الاختيار"}</small></div><div className="fake-qr" aria-label="رابط الدفع التجريبي">••<br />••</div></div>}
+            {payment && <div className="payment-ticket"><span className="status-dot pending-dot" /> <div><strong>الطلب قيد الانتظار</strong><small>Payment ID: {payment.id}</small><small>الحالة: {payment.status}</small><small>تاجر: {merchant?.businessName || "تم الاختيار"}</small>{payment.checkoutToken && <><small>رابط الدفع الخاص:</small><a href={`/pay?checkout=${encodeURIComponent(payment.checkoutToken)}`} className="break-all underline" target="_blank" rel="noreferrer">فتح صفحة الدفع</a></>}</div><div className="fake-qr" aria-label="رمز معاينة؛ لا يمثل QR حقيقيًا">••<br />••</div></div>}
           </section>
         </div>
 

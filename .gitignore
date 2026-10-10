@@ -49,3 +49,20 @@ temp/
 *.key
 *.crt
 secrets/
+
+# Local environment backups
+backend/.env.save
+
+# Local audit bundles and update archives
+PASSCARD_AUDIT_bundle.zip
+PASSCARD_AUDIT_manifest.txt
+passcard/*.zip
+
+# Editor and manual backups
+*.bak
+
+# Accidental empty files and npm notice artifacts
+/String
+/backend/nest
+/backend/passcard-backend@0.1.0
+/backend/11.21.0

@@ -1,3 +1,4 @@
+/* global fetch */
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import nodemailer from "nodemailer";
 

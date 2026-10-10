@@ -1,11 +1,12 @@
-import { IsInt, IsUUID, Max, Min } from "class-validator";
+import { IsInt, IsOptional, IsUUID, Max, Min } from "class-validator";
 
 export class AdminTopupDto {
   @IsUUID()
   userId!: string;
 
+  @IsOptional()
   @IsUUID()
-  cardId!: string;
+  cardId?: string;
 
   @IsInt()
   @Min(1)
